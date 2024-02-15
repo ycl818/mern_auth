@@ -41,7 +41,7 @@ export const signin = async (req, res, next) => {
       .cookie("jwt", accessToken, {
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000,
-        sameSite: "None",
+        // sameSite: "None",
       })
       .status(200)
       .json(rest);
