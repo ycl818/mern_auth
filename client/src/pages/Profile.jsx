@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import {
   getDownloadURL,
   getStorage,
@@ -7,18 +7,35 @@ import {
   uploadBytesResumable,
 } from "firebase/storage";
 import { app } from "../Firebase";
+import {
+  updateUserFailure,
+  updateUserStart,
+  updateUserSuccess,
+} from "../redux/user/userSlice";
 
 const Profile = () => {
-  const { currentUser } = useSelector((state) => state.user);
+  const dispatch = useDispatch();
+  // 這是從redux中 取出資料 應該類似於pinia
+  const { currentUser, loadding, error } = useSelector((state) => state.user);
+
+  // 上傳圖檔的input hidden 在<img />上onclick用
   const fileRef = useRef(null);
+
+  // input 接圖檔
   const [image, setImage] = useState(undefined);
+
+  // 上傳百分比
   const [imagePercent, setImagePercent] = useState(0);
+
+  // is firebase error
   const [imageError, setImageError] = useState(false);
+
+  // 儲存formData
   const [formData, setFormData] = useState({});
-  console.log("🚀 ~ Profile ~ formData:", formData);
 
-  console.log("🚀 ~ Profile ~ image:", image);
+  const [updateSuccess, setUpdateSuccess] = useState(false);
 
+  // 當input收到圖檔執行上傳function
   useEffect(() => {
     if (image) {
       handleFileUpload(image);
@@ -49,10 +66,38 @@ const Profile = () => {
     );
   };
 
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.id]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      dispatch(updateUserStart());
+      const res = await fetch(`/api/user/update/${currentUser._id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (data.success === false) {
+        dispatch(updateUserFailure(data));
+        return;
+      }
+      dispatch(updateUserSuccess(data));
+      setUpdateSuccess(true);
+    } catch (error) {
+      dispatch(updateUserFailure(error));
+    }
+    console.log(formData);
+  };
+
   return (
     <div className="p-3 max-w-lg mx-auto">
       <h1 className="text-3xl font-semibold text-center my-7">Profile</h1>
-      <form className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <input
           type="file"
           ref={fileRef}
@@ -86,6 +131,7 @@ const Profile = () => {
           id="username"
           placeholder="Username"
           className="bg-slate-100 rounded-lg p-3"
+          onChange={handleChange}
         />
         <input
           defaultValue={currentUser.email}
@@ -93,21 +139,28 @@ const Profile = () => {
           id="email"
           placeholder="Email"
           className="bg-slate-100 rounded-lg p-3"
+          onChange={handleChange}
         />
         <input
           type="password"
           id="password"
           placeholder="Password"
           className="bg-slate-100 rounded-lg p-3"
+          onChange={handleChange}
         />
         <button className="bg-slate-700 text-white p-3 rounded-lg uppercase hover:opacity-95 disabled:opacity-80">
-          update
+          {loadding ? "Loading..." : "Update"}
         </button>
       </form>
       <div className="flex justify-between mt-5">
         <span className="text-red-700 cursor-pointer">Delete Account</span>
         <span className="text-red-700 cursor-pointer">Sign out</span>
       </div>
+
+      <p className="text-red-700 mt-5">{error && "Something went wrong"}</p>
+      <p className="text-green-700 mt-5">
+        {updateSuccess && "User is updated successfully"}
+      </p>
     </div>
   );
 };
